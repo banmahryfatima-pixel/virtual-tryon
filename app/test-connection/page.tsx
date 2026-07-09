@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { supabase } from '../supabaseClient'; // استدعاء ملف الربط الذي أنشأناه
+import { supabase } from '../../supabaseClient'; // استدعاء ملف الربط الذي أنشأناه
 
 export default function TestConnectionPage() {
   const [loading, setLoading] = useState(false);

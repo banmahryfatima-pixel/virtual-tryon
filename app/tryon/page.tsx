@@ -1,168 +1,189 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
+import { useState } from 'react';
 
 export default function TryOnPage() {
-  // حالات رفع الصور والتحميل
-  const [humanImage, setHumanImage] = useState<string | null>(null)
-  const [garmentImage, setGarmentImage] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [resultImage, setResultImage] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [humanImage, setHumanImage] = useState<string | null>(null);
+  const [garmentImage, setGarmentImage] = useState<string | null>(null);
+  const [resultImage, setResultImage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [category, setCategory] = useState('upper_body');
 
-  // دالة تحويل الملف المرفوع إلى صيغة Base64 لتمريره للـ API
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'human' | 'garment') => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        if (type == 'human') setHumanImage(reader.result as string)
-        if (type == 'garment') setGarmentImage(reader.result as string)
-      };
-      reader.readAsDataURL(file)
+  const toBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const handleImage = async (file: File, type: 'human' | 'garment') => {
+    const base64 = await toBase64(file);
+    if (type === 'human') setHumanImage(base64);
+    else setGarmentImage(base64);
+  };
+
+  const handleTryOn = async () => {
+    if (!humanImage || !garmentImage) {
+      setError('يرجى رفع صورة العارض وصورة الملبس');
+      return;
     }
-  }
-
-  // إرسال الطلب للسيرفر وتفعيل حالة الانتظار
-  const handleGenerate = async () => {
-    if (!humanImage || !garmentImage) return
-
-    setIsLoading(true)
-    setError(null)
-    setResultImage(null)
-
+    setLoading(true);
+    setError('');
     try {
-      const response = await fetch('/api/tryon', {
+      const res = await fetch('/api/tryon', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          humanImage: humanImage,
-          garmentImage: garmentImage,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'فشلت عملية دمج الملابس، يرجى التحقق من الرصيد أو المحاولة لاحقاً.')
-      }
-
-      setResultImage(data.resultImage)
-    } catch (err: any) {
-      setError(err.message || 'حدث خطأ غير متوقع.')
-    } finally {
-      setIsLoading(false) // إيقاف التحميل سواء نجحت العملية أو فشلت
+        body: JSON.stringify({ humanImage, garmentImage, category }),
+      });
+      const data = await res.json();
+      if (data.error) setError(data.error);
+      else setResultImage(data.resultImage);
+    } catch {
+      setError('حدث خطأ، حاولي مرة أخرى');
     }
-  }
+    setLoading(false);
+  };
 
   return (
-    <main style={{ minHeight: '100vh', backgroundColor: '#ffffff', fontFamily: 'sans-serif', direction: 'rtl' }}>
-      {/* الهيدر المتناسق مع التصميم العام */}
-      <div style={{ borderBottom: '1px solid #000', padding: '24px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <a href="/" style={{ fontSize: '20px', fontWeight: '700', color: '#000', textDecoration: 'none' }}>Vtry</a>
-        <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-          <span style={{ fontSize: '14px', color: '#666' }}>لوحة تحكم التاجر</span>
-          <a href="/" style={{ fontSize: '14px', color: '#000', textDecoration: 'none' }}>الرئيسية</a>
+    <>
+      <style>{`
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #fafaf8; font-family: 'DM Sans', sans-serif; }
+        .page { min-height: 100vh; padding: 40px 60px; }
+        .header { margin-bottom: 48px; }
+        .header a { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; letter-spacing: 3px; color: #0a0a0a; text-decoration: none; }
+        .title { font-family: 'Playfair Display', serif; font-size: 36px; font-weight: 700; color: #0a0a0a; margin-bottom: 8px; }
+        .subtitle { font-size: 14px; color: #9a9a94; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; margin-top: 40px; }
+        .card { background: #fff; border: 1px solid #e8e8e4; padding: 28px; }
+        .card-title { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #b8952a; margin-bottom: 16px; }
+        .upload-area {
+          border: 1.5px dashed #e8e8e4; padding: 32px 16px;
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          cursor: pointer; transition: border-color 0.2s; text-align: center; position: relative;
+          min-height: 200px;
+        }
+        .upload-area:hover { border-color: #b8952a; }
+        .upload-area input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+        .upload-area img { width: 100%; max-height: 200px; object-fit: contain; }
+        .upload-icon { font-size: 32px; margin-bottom: 12px; }
+        .upload-text { font-size: 13px; color: #9a9a94; }
+        .category-select {
+          width: 100%; padding: 10px 14px; margin-top: 16px;
+          border: 1px solid #e8e8e4; background: #fafaf8;
+          font-family: 'DM Sans', sans-serif; font-size: 13px; color: #0a0a0a;
+          cursor: pointer;
+        }
+        .btn {
+          width: 100%; padding: 16px; margin-top: 16px;
+          background: #0a0a0a; color: #fff; border: none;
+          font-family: 'DM Sans', sans-serif; font-size: 13px;
+          letter-spacing: 1px; text-transform: uppercase;
+          cursor: pointer; transition: background 0.2s;
+        }
+        .btn:hover { background: #b8952a; }
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
+        .result-area {
+          min-height: 200px; display: flex; align-items: center; justify-content: center;
+          border: 1px solid #e8e8e4; background: #f4f4f2;
+        }
+        .result-area img { width: 100%; object-fit: contain; }
+        .result-placeholder { text-align: center; color: #9a9a94; }
+        .result-placeholder .icon { font-size: 40px; margin-bottom: 12px; }
+        .result-placeholder p { font-size: 13px; }
+        .error { color: #e53e3e; font-size: 13px; margin-top: 12px; text-align: center; }
+        .loading { text-align: center; color: #b8952a; font-size: 13px; padding: 40px; }
+        .download-btn {
+          width: 100%; padding: 12px; margin-top: 12px;
+          background: #b8952a; color: #fff; border: none;
+          font-family: 'DM Sans', sans-serif; font-size: 12px;
+          letter-spacing: 1px; text-transform: uppercase;
+          cursor: pointer; transition: background 0.2s; text-align: center; display: block;
+        }
+        .download-btn:hover { background: #0a0a0a; }
+        @media (max-width: 900px) {
+          .page { padding: 24px; }
+          .grid { grid-template-columns: 1fr; }
+        }
+      `}</style>
+
+      <div className="page">
+        <div className="header">
+          <a href="/">VTRY</a>
         </div>
-      </div>
+        <h1 className="title">Virtual Try-On</h1>
+        <p className="subtitle">ارفع صورة العارض وصورة الملبس — شاهد النتيجة في ثوانٍ</p>
 
-      <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '60px 20px' }}>
-        <h2 style={{ fontSize: '32px', fontWeight: '700', color: '#000', marginBottom: '12px', textAlign: 'center' }}>غرفة القياس الذكية للتجار</h2>
-        <p style={{ fontSize: '15px', color: '#666', marginBottom: '40px', textAlign: 'center' }}>ارفع صورة الموديل وصورة المنتج وقم بدمجهما فوراً لعرضها في متجرك.</p>
-
-        {/* شبكة رفع الصور والنتائج */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', marginBottom: '40px' }}>
-          
-          {/* القسم الأيمن: أدوات الرفع */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {/* 1. رفع صورة الموديل البشري */}
-            <div style={{ border: '1px solid #eee', padding: '20px', borderRadius: '12px' }}>
-              <label style={{ display: 'block', fontWeight: '600', marginBottom: '12px', fontSize: '14px' }}>1. صورة الموديل (أو التاجر):</label>
-              <input type="file" accept="image/*" onChange={(e) => handleImageChange(e, 'human')} style={{ marginBottom: '10px', display: 'block' }} />
-              {humanImage && <img src={humanImage} alt="Model" style={{ width: '100%', maxHeight: '150px', objectFit: 'contain', borderRadius: '6px', marginTop: '10px' }} />}
+        <div className="grid">
+          {/* صورة العارض */}
+          <div className="card">
+            <p className="card-title">Model Photo — صورة العارض</p>
+            <div className="upload-area">
+              <input type="file" accept="image/*" onChange={e => e.target.files && handleImage(e.target.files[0], 'human')} />
+              {humanImage ? (
+                <img src={humanImage} alt="human" />
+              ) : (
+                <>
+                  <div className="upload-icon">🧍</div>
+                  <p className="upload-text">اضغطي لرفع صورة العارض</p>
+                </>
+              )}
             </div>
-
-            {/* 2. رفع صورة قطعة الملابس */}
-            <div style={{ border: '1px solid #eee', padding: '20px', borderRadius: '12px' }}>
-              <label style={{ display: 'block', fontWeight: '600', marginBottom: '12px', fontSize: '14px' }}>2. صورة قطعة الملابس (المنتج):</label>
-              <input type="file" accept="image/*" onChange={(e) => handleImageChange(e, 'garment')} style={{ marginBottom: '10px', display: 'block' }} />
-              {garmentImage && <img src={garmentImage} alt="Garment" style={{ width: '100%', maxHeight: '150px', objectFit: 'contain', borderRadius: '6px', marginTop: '10px' }} />}
-            </div>
-
-            {/* زر التوليد التفاعلي الذكي الذي يغلق نفسه عند التحميل */}
-            <button
-              onClick={handleGenerate}
-              disabled={isLoading || !humanImage || !garmentImage}
-              style={{
-                width: '100%',
-                backgroundColor: isLoading || (!humanImage || !garmentImage) ? '#666' : '#000',
-                color: '#fff',
-                padding: '16px',
-                borderRadius: '8px',
-                border: 'none',
-                fontSize: '16px',
-                fontWeight: '600',
-                cursor: isLoading || (!humanImage || !garmentImage) ? 'not-allowed' : 'pointer',
-                transition: 'background-color 0.2s'
-              }}
-            >
-              {isLoading ? 'جاري دمج الملابس بالذكاء الاصطناعي...' : 'توليد المظهر الافتراضي الآن ✨'}
-            </button>
+            <select className="category-select" value={category} onChange={e => setCategory(e.target.value)}>
+              <option value="upper_body">أعلى الجسم — Upper Body</option>
+              <option value="lower_body">أسفل الجسم — Lower Body</option>
+              <option value="dresses">فستان كامل — Dresses</option>
+            </select>
           </div>
 
-          {/* القسم الأيسر: شاشة النتيجة وحالة الانتظار */}
-          <div style={{ 
-            border: '1px solid #000', 
-            borderRadius: '12px', 
-            backgroundColor: '#fafafa', 
-            display: 'flex', 
-            flexDirection: 'column',
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            padding: '20px',
-            minHeight: '400px'
-          }}>
-            {isLoading ? (
-              /* تصميم الـ Loading البصري الفاخر */
-              <div style={{ textAlign: 'center' }}>
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  border: '3px solid #ccc',
-                  borderTop: '3px solid #000',
-                  borderRadius: '50%',
-                  margin: '0 auto 20px',
-                  animation: 'spin 1s linear infinite'
-                }}></div>
-                <style>{`
-                  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-                `}</style>
-                <p style={{ fontSize: '15px', fontWeight: '600', color: '#000', margin: '0 0 4px' }}>يتم الآن تلبيس الموديل...</p>
-                <p style={{ fontSize: '13px', color: '#666', margin: 0 }}>يستغرق محرك Vtry حوالي 10 ثوانٍ لضبط القياسات</p>
-              </div>
-            ) : error ? (
-              /* إظهار الخطأ بشكل ودي إذا حدث */
-              <div style={{ textAlign: 'center', padding: '0 20px' }}>
-                <p style={{ fontSize: '32px', margin: '0 0 10px' }}>⚠️</p>
-                <p style={{ fontSize: '14px', color: '#cc0000', fontWeight: '600', lineHeight: '1.4' }}>{error}</p>
-              </div>
-            ) : resultImage ? (
-              /* عرض النتيجة النهائية */
-              <div style={{ width: '100%', textAlign: 'center' }}>
-                <img src={resultImage} alt="Vtry Result" style={{ width: '100%', maxHeight: '350px', objectFit: 'contain', borderRadius: '8px', marginBottom: '16px' }} />
-                <p style={{ fontSize: '14px', color: 'green', fontWeight: '600' }}>🚀 تم التجهيز بنجاح!</p>
-              </div>
-            ) : (
-              /* الحالة الافتراضية قبل الرفع */
-              <div style={{ textAlign: 'center', color: '#999' }}>
-                <p style={{ fontSize: '40px', margin: '0 0 16px' }}>✨</p>
-                <p style={{ fontSize: '14px' }}>صورة القياس النهائي للتاجر ستظهر هنا</p>
-              </div>
+          {/* صورة الملبس */}
+          <div className="card">
+            <p className="card-title">Garment Photo — صورة الملبس</p>
+            <div className="upload-area">
+              <input type="file" accept="image/*" onChange={e => e.target.files && handleImage(e.target.files[0], 'garment')} />
+              {garmentImage ? (
+                <img src={garmentImage} alt="garment" />
+              ) : (
+                <>
+                  <div className="upload-icon">👗</div>
+                  <p className="upload-text">اضغطي لرفع صورة الملبس</p>
+                </>
+              )}
+            </div>
+            <button className="btn" onClick={handleTryOn} disabled={loading}>
+              {loading ? '⏳ جاري المعالجة...' : '✨ ابدأ التجربة الافتراضية'}
+            </button>
+            {error && <p className="error">{error}</p>}
+          </div>
+
+          {/* النتيجة */}
+          <div className="card">
+            <p className="card-title">Result — النتيجة</p>
+            <div className="result-area">
+              {loading ? (
+                <div className="loading">
+                  <div>⏳</div>
+                  <p>الذكاء الاصطناعي يعمل...<br />يستغرق 10-30 ثانية</p>
+                </div>
+              ) : resultImage ? (
+                <img src={resultImage} alt="result" />
+              ) : (
+                <div className="result-placeholder">
+                  <div className="icon">✨</div>
+                  <p>النتيجة ستظهر هنا</p>
+                </div>
+              )}
+            </div>
+            {resultImage && (
+              <a href={resultImage} download="vtry-result.jpg" className="download-btn">
+                ⬇️ تحميل الصورة
+              </a>
             )}
           </div>
-
         </div>
       </div>
-    </main>
-  )
+    </>
+  );
 }
