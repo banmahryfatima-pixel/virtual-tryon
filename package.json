@@ -12,6 +12,7 @@
     "@google/generative-ai": "^0.24.1",
     "@gradio/client": "^2.2.0",
     "@huggingface/inference": "^4.13.15",
+    "@supabase/supabase-js": "^2.110.2",
     "axios": "^1.16.1",
     "next": "16.2.6",
     "react": "19.2.4",
